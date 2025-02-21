@@ -1,21 +1,23 @@
 const { OpenAI } = require('openai');
 
-console.log('hexo-llm-tagging: Plugin started!'); // 使用 console.log 替代 hexo.log.debug
+console.log('hexo-llm-tagging: Plugin started!');
 
 module.exports = function(hexo) {
     hexo.extend.filter.register('before_post_render', async function(data) {
         const post = data;
+
+        console.log('hexo-llm-tagging: Accessing hexo.config...'); // 步骤 1: 尝试访问 hexo.config
+        const hexoConfig = hexo.config;
+        console.log('hexo-llm-tagging: hexo.config accessed:', hexoConfig); // 步骤 2: 打印 hexo.config 的内容 (可能包含敏感信息，请注意脱敏)
+
+        console.log('hexo-llm-tagging: Accessing hexo.config.llm_tagging...'); // 步骤 3: 尝试访问 hexo.config.llm_tagging
         const config = hexo.config.llm_tagging;
-
-        console.log('hexo-llm-tagging: Configuration loaded:', config); // 使用 console.log 替代 hexo.log.debug
-
-        hexo.log.debug('hexo-llm-tagging: Plugin started processing post:', post.title); // 添加 debug 日志：插件开始处理文章
-
-        hexo.log.debug('hexo-llm-tagging: Configuration loaded:', config); // 添加 debug 日志：输出加载的配置
+        console.log('hexo-llm-tagging: hexo.config.llm_tagging accessed:', config); // 步骤 4: 打印 hexo.config.llm_tagging 的内容
+        console.log('hexo-llm-tagging: Configuration loaded:', config); // 原始的 Configuration loaded 日志
 
         if (!config || !config.api_key || !config.model || !config.endpoint) {
             hexo.log.warn('hexo-llm-tagging: Plugin is not configured correctly. Please check your _config.yml.');
-            return data; // 配置不完整，跳过处理
+            return data;
         }
 
         if (!post.content) {
