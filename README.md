@@ -21,26 +21,39 @@
 
 ## Configuration
 
-In your `_config.yml`, add the following configuration for `hexo-llm-tagging`:
+Add the following configuration to your Hexo `_config.yml` file:
 
 ```yaml
-hexo-llm-tagging:
-  endpoint: "https://api.openai.com/v1"  # OpenAI API endpoint (default is https://api.openai.com/v1)
-  modelName: "gpt-4"                    # The model name to use (default is "gpt-4")
-  apiKey: "your_api_key_here"            # Your OpenAI API key
+llm_tagging:
+  api_key: your_openai_api_key  # Your OpenAI API key or API key for compatible service
+  model: gpt-3.5-turbo        # The model name you want to use (e.g., gpt-3.5-turbo, gpt-4, etc.)
+  endpoint: https://api.openai.com/v1 # The API endpoint. For OpenAI, it's https://api.openai.com/v1. For compatible services, use their endpoint.
 ```
 
-- `endpoint`: The API endpoint of the OpenAI-compatible model. Default is `https://api.openai.com/v1`.
-- `modelName`: The name of the model you want to use. By default, it uses `gpt-4`, but you can configure it to use other models like `gpt-3.5` or any other OpenAI-compatible model.
-- `apiKey`: Your API key to authenticate the requests. This is required to use the plugin.
+**Configuration Options:**
+
+- `api_key`: **Required.** Your API key for accessing the LLM service.
+- `model`: **Required.** The name of the LLM model you want to use.
+- `endpoint`: **Required.** The API endpoint of the LLM service. For OpenAI's official API, use `https://api.openai.com/v1`. For other compatible services, refer to their documentation for the correct endpoint.
+
+**Example `_config.yml`:**
+
+```yaml
+# ... other Hexo configurations
+
+llm_tagging:
+  api_key: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  model: gpt-3.5-turbo
+  endpoint: https://api.openai.com/v1
+
+# ... other Hexo configurations
+```
 
 ## Usage
 
-Once configured, the plugin will automatically generate tags and categories for each blog post. This happens after Hexo renders the posts.
-
-1. The plugin sends the content of each post to the specified model.
-2. The model will return suggested tags and categories.
-3. The tags and categories will be applied to the post before publishing.
+1. **Install the plugin:** `npm install hexo-llm-tagging`
+2. **Configure the plugin:** Add the `llm_tagging` section to your Hexo `_config.yml` file with your API key, model name, and endpoint.
+3. **Write your Hexo posts as usual.** When you generate your Hexo site (`hexo generate`), the plugin will automatically call the LLM API for each post and add suggested categories and tags to the post's front-matter.
 
 ## Example
 
