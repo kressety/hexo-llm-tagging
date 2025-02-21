@@ -23,19 +23,6 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-
-      - name: Clean git working directory
-        run: git reset --hard && git clean -fd
-
-      - name: Bump version
-        run: |
-          npm version patch -m "chore(release): %s"
-          
-      - name: Commit version bump
-        run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git push --follow-tags
           
       - name: Publish to NPM
         run: npm publish
