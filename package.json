@@ -1,6 +1,6 @@
 {
   "name": "hexo-llm-tagging",
-  "version": "1.0.3",
+  "version": "2.0.0",
   "description": "A Hexo plugin to automatically generate tags and categories using any OpenAI-compatible model.",
   "main": "index.js",
   "files": [
