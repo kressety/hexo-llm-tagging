@@ -1,9 +1,13 @@
 const { OpenAI } = require('openai');
 
+console.log('hexo-llm-tagging: Plugin started!'); // 使用 console.log 替代 hexo.log.debug
+
 module.exports = function(hexo) {
     hexo.extend.filter.register('before_post_render', async function(data) {
         const post = data;
         const config = hexo.config.llm_tagging;
+
+        console.log('hexo-llm-tagging: Configuration loaded:', config); // 使用 console.log 替代 hexo.log.debug
 
         hexo.log.debug('hexo-llm-tagging: Plugin started processing post:', post.title); // 添加 debug 日志：插件开始处理文章
 
