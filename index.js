@@ -3,85 +3,72 @@ const { OpenAI } = require('openai');
 console.log('hexo-llm-tagging: Plugin started!');
 
 module.exports = function(hexo) {
-    hexo.extend.filter.register('before_post_render', async function(data) {
+    hexo.extend.filter.register('before_post_render', (data) => {
         const post = data;
 
-        console.log('hexo-llm-tagging: Accessing hexo.config...'); // 步骤 1: 尝试访问 hexo.config
+        console.log('hexo-llm-tagging: Accessing hexo.config...');
         const hexoConfig = hexo.config;
-        console.log('hexo-llm-tagging: hexo.config accessed:', hexoConfig); // 步骤 2: 打印 hexo.config 的内容 (可能包含敏感信息，请注意脱敏)
+        console.log('hexo-llm-tagging: hexo.config accessed:', hexoConfig); // 打印完整的 hexo.config 对象!
 
-        console.log('hexo-llm-tagging: Accessing hexo.config.llm_tagging...'); // 步骤 3: 尝试访问 hexo.config.llm_tagging
-        const config = hexo.config.llm_tagging;
-        console.log('hexo-llm-tagging: hexo.config.llm_tagging accessed:', config); // 步骤 4: 打印 hexo.config.llm_tagging 的内容
-        console.log('hexo-llm-tagging: Configuration loaded:', config); // 原始的 Configuration loaded 日志
+        if (hexoConfig) { // 检查 hexoConfig 是否为真值 (非 null 或 undefined)
+            console.log('hexo-llm-tagging: hexo.config is truthy. Now accessing hexo.config[\'llm-tagging\']...');
+            const config = hexo.config['llm-tagging']; // 使用方括号和连字符键名 (与 _config.yml 一致)
+            console.log('hexo-llm-tagging: hexo.config[\'llm-tagging\'] accessed:', config);
+            console.log('hexo-llm-tagging: Configuration loaded:', config);
 
-        if (!config || !config.api_key || !config.model || !config.endpoint) {
-            hexo.log.warn('hexo-llm-tagging: Plugin is not configured correctly. Please check your _config.yml.');
-            return data;
-        }
+            if (!config || !config.api_key || !config.model || !config.endpoint) {
+                hexo.log.warn('hexo-llm-tagging: Plugin is not configured correctly. Please check your _config.yml.');
+                return data;
+            }
 
-        if (!post.content) {
-            hexo.log.debug(`hexo-llm-tagging: Post "${post.title}" has no content, skipping.`); // 添加 debug 日志：文章没有内容
-            return data; // 没有内容，跳过处理
-        }
+            // 示例： 使用配置项 (目前没有实际的 LLM API 调用)
+            const apiKey = config.api_key;
+            const modelName = config.model;
+            const apiEndpoint = config.endpoint;
 
-        const openai = new OpenAI({
-            apiKey: config.api_key,
-            baseURL: config.endpoint,
-        });
+            console.log('hexo-llm-tagging: API Key:', apiKey ? 'Configured' : 'Not Configured'); // 仅指示是否配置
+            console.log('hexo-llm-tagging: Model Name:', modelName);
+            console.log('hexo-llm-tagging: API Endpoint:', apiEndpoint);
 
-        const prompt = `请根据以下文章内容，生成 3-5 个最相关的中文标签(tag)和 1-2 个分类(category)。\n\n文章标题: ${post.title}\n\n文章内容:\n${post.content}\n\n请以 JSON 格式返回结果，包含 "categories" 和 "tags" 字段，均为字符串数组。`;
 
-        hexo.log.debug('hexo-llm-tagging: Prompt being sent to LLM:', prompt); // 添加 debug 日志：输出发送给 LLM 的 Prompt
-
-        try {
-            hexo.log.debug(`hexo-llm-tagging: Sending request to LLM for post "${post.title}".`);
-            const response = await openai.chat.completions.create({
-                model: config.model,
-                messages: [{ role: 'user', content: prompt }],
+            // 原始的 prompt 和 tag 生成逻辑 (目前被注释掉)
+            /*
+            const openai = new OpenAI({
+                apiKey: config.api_key,
+                baseURL: config.endpoint // 确保使用配置的 endpoint
             });
 
-            const responseContent = response.choices[0].message.content;
-            hexo.log.debug(`hexo-llm-tagging: LLM raw response for post "${post.title}": ${responseContent}`); // 添加 debug 日志：输出 LLM 的原始响应
-
-            let result;
-            try {
-                result = JSON.parse(responseContent);
-                hexo.log.debug(`hexo-llm-tagging: JSON response parsed successfully for post "${post.title}":`, result); // 添加 debug 日志：JSON 解析成功并输出结果
-            } catch (e) {
-                hexo.log.warn(`hexo-llm-tagging: Failed to parse JSON response from LLM for post "${post.title}". Response was: ${responseContent}`);
-                return data; // JSON 解析失败，跳过处理
-            }
-
-            if (result && Array.isArray(result.categories) && Array.isArray(result.tags)) {
-                post.categories = post.categories || [];
-                post.tags = post.tags || [];
-
-                // 添加分类，如果文章 front-matter 中没有分类，则直接赋值，否则合并去重
-                if (!post.categories.length) {
-                    post.categories = result.categories.filter(cat => cat && typeof cat === 'string');
-                } else {
-                    const existingCategories = post.categories.map(cat => typeof cat === 'object' ? cat.name : cat);
-                    const newCategories = result.categories.filter(cat => cat && typeof cat === 'string' && !existingCategories.includes(cat));
-                    post.categories = [...post.categories, ...newCategories];
+            async function generateTags(text) {
+                try {
+                    const completion = await openai.chat.completions.create({
+                        model: config.model,
+                        messages: [{"role": "user", "content": `请提取以下文章的关键词，用逗号分隔，关键词数量不超过5个:\n\n${text}`}],
+                    });
+                    return completion.choices[0].message.content.trim().split(',').map(tag => tag.trim());
+                } catch (error) {
+                    console.error('Error calling OpenAI API:', error);
+                    return []; // 发生错误时返回空数组，避免影响文章生成
                 }
-
-                // 添加标签，合并去重
-                const existingTags = post.tags.map(tag => tag.toLowerCase());
-                const newTags = result.tags.filter(tag => tag && typeof tag === 'string' && !existingTags.includes(tag.toLowerCase())).map(tag => tag.trim());
-                post.tags = [...post.tags, ...newTags];
-
-                hexo.log.info(`hexo-llm-tagging: Categories and tags generated for post "${post.title}". Categories: ${post.categories.join(', ')}, Tags: ${post.tags.join(', ')}`);
-            } else {
-                hexo.log.warn(`hexo-llm-tagging: Invalid response format from LLM for post "${post.title}". Expected JSON with "categories" and "tags" arrays.`);
             }
 
-        } catch (error) {
-            hexo.log.error(`hexo-llm-tagging: Error processing post "${post.title}":`, error);
-            hexo.log.error('hexo-llm-tagging: Full error details:', error); // 添加 debug 日志：输出完整的错误信息
+
+            if (config.tagging_enable !== false) { // 显式检查是否不为 false，默认启用
+                return generateTags(post.content).then(tags => {
+                    console.log('hexo-llm-tagging: Generated tags:', tags); // 打印生成的标签
+                    post.tags = post.tags.concat(tags); // 将生成的标签添加到文章的 tags 中
+                    return data;
+                }).catch(error => {
+                    console.error('hexo-llm-tagging: Error in tag generation process:', error); // 捕获 Promise 链中的错误
+                    return data; // 即使发生错误也继续文章生成
+                });
+            }
+            */
+
+
+        } else {
+            console.log('hexo-llm-tagging: hexo.config is falsy (null or undefined)!  Something is seriously wrong with Hexo config loading.');
         }
 
-        hexo.log.debug('hexo-llm-tagging: Plugin finished processing post:', post.title); // 添加 debug 日志：插件完成处理文章
-        return data;
+        return data; // 确保同步函数也返回 data
     });
 };
