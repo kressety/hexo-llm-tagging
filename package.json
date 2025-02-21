@@ -18,6 +18,10 @@
   ],
   "author": "Zack Zhu <contact@ziqizhu.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kressety/hexo-llm-tagging"
+  },
   "dependencies": {
     "openai": "^4.85.3"
   }
