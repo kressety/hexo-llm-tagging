@@ -97,14 +97,7 @@ hexo.extend.filter.register('before_post_render', async (data) => {
         // 回写到原始 md 文件
         fs.writeFile(data.full_source, newFrontmatter, 'utf-8');
 
-        // 更新 data 对象以影响本次渲染
-        data.categories = parsed.categories;
-        data.tags = parsed.tags;
-
         hexo.log.info(`Tagged post: ${data.title || data.source} - Category: ${category}, Tags: ${tags.join(', ')}`);
-        const categoryNames = data.categories.map(c => typeof c === 'string' ? c : c.name);
-        const tagNames = data.tags.map(t => typeof t === 'string' ? t : t.name);
-        hexo.log.debug(`Before render - Title: ${data.title}, Categories: ${JSON.stringify(categoryNames)}, Tags: ${JSON.stringify(tagNames)}`);
     } catch (error) {
         hexo.log.error(`Failed to tag post ${data.title || data.source}: ${error.message}`);
     }
