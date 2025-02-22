@@ -5,17 +5,16 @@ const front = require('hexo-front-matter');
 const fs = require('hexo-fs');
 
 // 获取纯文本内容
-function getPlainTextContent(content, title) {
+function getPlainTextContent(content) {
     const md = new MarkdownIt();
     const html = md.render(content);
     const plainText = htmlToText.convert(html, { wordwrap: false });
     const maxLength = 4000;
-    const text = `${title}: ${plainText}`; // 添加标题
-    return text.length > maxLength ? text.substring(0, maxLength) : text;
+    return plainText.length > maxLength ? plainText.substring(0, maxLength) : plainText;
 }
 
 // 使用 GPT 生成分类和标签
-async function generateTagsWithGPT(content, client, config, hexo) {
+async function generateTagsWithGPT(content, title, client, config, hexo) {
     const prompt = `
     Analyze the following article content and generate:
     1. A single category (a broad topic the article belongs to).
@@ -27,8 +26,8 @@ async function generateTagsWithGPT(content, client, config, hexo) {
     }
     Do not include code block markers (e.g., \`\`\`json or \`\`\`) in your response.
     
-    Content:
-    ${content}
+    Title: ${title}
+    Content: ${content}
   `;
 
     try {
@@ -45,8 +44,7 @@ async function generateTagsWithGPT(content, client, config, hexo) {
         let rawResponse = response.choices[0].message.content.trim();
         rawResponse = rawResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
 
-        const result = JSON.parse(rawResponse);
-        return result;
+        return JSON.parse(rawResponse);
     } catch (error) {
         hexo.log.error(`GPT API call failed: ${error.message}`);
         hexo.log.debug(`Raw GPT response: ${response?.choices[0]?.message?.content || 'No response'}`);
@@ -69,7 +67,6 @@ const client = new OpenAI({
 hexo.log.info('hexo-llm-tagging plugin initialized');
 
 hexo.extend.filter.register('before_post_render', async (data) => {
-    // 只处理 _posts 目录下的文章
     if (!data.source || !data.source.startsWith('_posts/')) {
         hexo.log.debug(`Skipping non-post page: ${data.title || data.source}`);
         return data;
@@ -77,37 +74,37 @@ hexo.extend.filter.register('before_post_render', async (data) => {
 
     hexo.log.info(`Processing post: ${data.title || data.source}`);
 
-    const plainText = getPlainTextContent(data.content, data.title);
+    const plainText = getPlainTextContent(data.content);
     if (!plainText) {
         hexo.log.warn(`No content found for post: ${data.title || data.source}`);
         return data;
     }
 
     try {
-        const { category, tags } = await generateTagsWithGPT(plainText, client, config, hexo);
+        const { category, tags } = await generateTagsWithGPT(plainText, data.title, client, config, hexo);
 
-        // 解析当前 front-matter
-        const frontmatter = front.parse(data.raw);
+        // 读取源文件以获取现有 front-matter
+        const parsed = front.parse(data.raw);
 
-        // 更新 category 和 tags
-        frontmatter.category = category;
-        // 如果已有 tags，合并，否则直接赋值
-        const existingTags = Array.isArray(frontmatter.tags) ? frontmatter.tags : [];
-        frontmatter.tags = Array.from(new Set([...existingTags, ...tags]));
+        // 更新 front-matter
+        parsed.categories = [category]; // 每次覆盖为单个分类
+        parsed.tags = tags; // 每次覆盖为新的标签列表
 
         // 生成新的 front-matter 字符串
-        let newFrontmatter = front.stringify(frontmatter);
+        let newFrontmatter = front.stringify(parsed);
         newFrontmatter = '---\n' + newFrontmatter;
 
-        // 更新 data 对象以影响渲染
-        data.category = category;
-        data.tags = frontmatter.tags;
+        // 回写到原始 md 文件
+        fs.writeFile(data.full_source, newFrontmatter, 'utf-8');
 
-        // 可选：写入源文件（如果需要持久化）
-        // await fs.writeFile(data.full_source, newFrontmatter + '\n' + data.content, 'utf-8');
-        // hexo.log.info(`Updated file: ${data.full_source}`);
+        // 更新 data 对象以影响本次渲染
+        data.categories = parsed.categories;
+        data.tags = parsed.tags;
 
         hexo.log.info(`Tagged post: ${data.title || data.source} - Category: ${category}, Tags: ${tags.join(', ')}`);
+        const categoryNames = data.categories.map(c => typeof c === 'string' ? c : c.name);
+        const tagNames = data.tags.map(t => typeof t === 'string' ? t : t.name);
+        hexo.log.debug(`Before render - Title: ${data.title}, Categories: ${JSON.stringify(categoryNames)}, Tags: ${JSON.stringify(tagNames)}`);
     } catch (error) {
         hexo.log.error(`Failed to tag post ${data.title || data.source}: ${error.message}`);
     }
