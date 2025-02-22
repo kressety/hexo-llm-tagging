@@ -1,23 +1,31 @@
-# hexo-llm-tagging
+# Hexo LLM Tagging Plugin
 
-`hexo-llm-tagging` is a Hexo plugin that automatically generates tags and categories for your blog posts using any OpenAI-compatible language model. The model, API endpoint, and API key are configurable, making the plugin flexible for different use cases.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Hexo](https://img.shields.io/badge/hexo-%3E%3D%207.3.0-brightgreen.svg)
+![Node.js](https://img.shields.io/badge/node-%3E%3D%2022.x-blue.svg)
+
+A Hexo plugin that uses OpenAI's LLM (Large Language Model) to automatically generate categories and tags for your blog posts based on their content.
 
 ## Features
 
-- Automatically generates tags and categories for Hexo blog posts.
-- Uses OpenAI-compatible language models like GPT-3, GPT-4, or other models that support the OpenAI API.
-- Configuration options for API endpoint, model name, and API key.
-- Seamlessly integrates with Hexo's post rendering system.
+- **Automatic Tagging**: Analyzes post content using OpenAI's API to generate a single category and 2-5 relevant tags.
+- **Seamless Integration**: Works with Hexo's `before_post_render` filter to update `front-matter` without altering post content.
+- **Configurable**: Supports custom OpenAI models, API keys, and endpoints via Hexo configuration.
+- **Debugging Support**: Detailed logging for troubleshooting and verification.
 
 ## Installation
 
-1. Install the plugin via npm in your Hexo project:
-
+1. **Install the Plugin**:
+   Run the following command in your Hexo project directory:
    ```bash
    npm install hexo-llm-tagging --save
    ```
 
-2. After installation, configure the plugin in your Hexo project's `_config.yml`.
+2. **Install Dependencies**:
+   Ensure the required dependencies are installed:
+   ```bash
+   npm install openai markdown-it html-to-text hexo-front-matter hexo-fs
+   ```
 
 ## Configuration
 
@@ -25,48 +33,101 @@ Add the following configuration to your Hexo `_config.yml` file:
 
 ```yaml
 llm_tagging:
-  api_key: your_openai_api_key  # Your OpenAI API key or API key for compatible service
-  model: gpt-3.5-turbo        # The model name you want to use (e.g., gpt-3.5-turbo, gpt-4, etc.)
-  endpoint: https://api.openai.com/v1 # The API endpoint. For OpenAI, it's https://api.openai.com/v1. For compatible services, use their endpoint.
+  api_key: "your-openai-api-key"
+  model: "gpt-3.5-turbo" # or any other supported model
+  endpoint: "https://api.openai.com/v1" # optional, defaults to OpenAI's API
+  max_tokens: 100 # optional, defaults to 100
 ```
 
-**Configuration Options:**
-
-- `api_key`: **Required.** Your API key for accessing the LLM service.
-- `model`: **Required.** The name of the LLM model you want to use.
-- `endpoint`: **Required.** The API endpoint of the LLM service. For OpenAI's official API, use `https://api.openai.com/v1`. For other compatible services, refer to their documentation for the correct endpoint.
-
-**Example `_config.yml`:**
-
-```yaml
-# ... other Hexo configurations
-
-llm_tagging:
-  api_key: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  model: gpt-3.5-turbo
-  endpoint: https://api.openai.com/v1
-
-# ... other Hexo configurations
-```
+- `api_key`: Your OpenAI API key (required).
+- `model`: The OpenAI model to use (required).
+- `endpoint`: Custom API endpoint (optional).
+- `max_tokens`: Maximum tokens for the API response (optional).
 
 ## Usage
 
-1. **Install the plugin:** `npm install hexo-llm-tagging`
-2. **Configure the plugin:** Add the `llm_tagging` section to your Hexo `_config.yml` file with your API key, model name, and endpoint.
-3. **Write your Hexo posts as usual.** When you generate your Hexo site (`hexo generate`), the plugin will automatically call the LLM API for each post and add suggested categories and tags to the post's front-matter.
+1. **Write Your Posts**:
+   Create or edit Markdown files in the `_posts` directory as usual. The plugin will process them automatically.
 
-## Example
+2. **Generate Site**:
+   Run Hexo generation to tag your posts:
+   ```bash
+   hexo generate --debug
+   ```
+   Use `--debug` to see detailed logs of the tagging process.
 
-Here is an example of how a blog post might look after the plugin runs:
+3. **Check Results**:
+    - The plugin updates the `categories` and `tags` in the `front-matter` of each post.
+    - Example before:
+      ```
+      ---
+      title: Better MC 个人汉化
+      date: 2023-12-12 19:55:38
+      ---
+      ![](images/Better-MC-个人汉化/1.png)
+      ## 整合包介绍
+      ...
+      ```
+    - Example after:
+      ```
+      ---
+      title: Better MC 个人汉化
+      categories:
+        - 游戏模组
+      tags:
+        - Minecraft
+        - 汉化
+        - Better MC
+        - 模组整合包
+        - Forge
+      date: 2023-12-12 19:55:38
+      ---
+      ![](images/Better-MC-个人汉化/1.png)
+      ## 整合包介绍
+      ...
+      ```
 
-- Post content:
-  ```
-  This is a blog post about machine learning and artificial intelligence. It explores recent advancements in the field and how they are transforming industries.
-  ```
+## How It Works
 
-- Generated tags: `["machine learning", "artificial intelligence", "technology"]`
-- Generated categories: `["AI", "Technology"]`
+- **Content Analysis**: The plugin extracts plain text from your Markdown content using `markdown-it` and `html-to-text`.
+- **LLM Processing**: Sends the title and content to OpenAI's API, requesting a single category and 2-5 tags in JSON format.
+- **Front-matter Update**: Updates the `front-matter` with the generated `categories` and `tags`, preserving the original post content.
+- **Rendering Sync**: Ensures the updated metadata is reflected in Hexo's rendering process.
+
+## Logging
+
+- **Info**: Logs when a post is processed and tagged successfully.
+- **Debug**: Provides detailed output, including `front-matter` updates and rendering states.
+- **Error**: Reports issues like API failures or configuration errors.
+
+Example debug output:
+```
+INFO  Processing post: Better MC 个人汉化
+INFO  Tagged post: Better MC 个人汉化 - Category: 游戏模组, Tags: Minecraft, 汉化, Better MC, 模组整合包, Forge
+DEBUG Before render - Title: Better MC 个人汉化, Categories: ["游戏模组"], Tags: ["Minecraft", "汉化", "Better MC", "模组整合包", "Forge"]
+```
+
+## Troubleshooting
+
+- **API Errors**: Ensure your `api_key` is valid and you have network access to the OpenAI endpoint.
+- **Missing Tags**: Check if `max_tokens` is sufficient for the API response.
+- **Content Not Tagged**: Verify that the post is in the `_posts` directory and contains readable content.
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature/your-feature`).
+3. Commit your changes (`git commit -m "Add your feature"`).
+4. Push to the branch (`git push origin feature/your-feature`).
+5. Open a Pull Request.
 
 ## License
 
-MIT License. See the [LICENSE](LICENSE) file for more details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built with [Hexo](https://hexo.io/), [OpenAI](https://openai.com/), and various Node.js libraries.
+- Inspired by the need for automated metadata generation in blogging workflows.
