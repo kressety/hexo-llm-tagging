@@ -104,8 +104,8 @@ hexo.extend.filter.register('before_post_render', async (data) => {
         data.tags = frontmatter.tags;
 
         // 可选：写入源文件（如果需要持久化）
-        await fs.writeFile(data.full_source, newFrontmatter + '\n' + data.content, 'utf-8');
-        hexo.log.info(`Updated file: ${data.full_source}`);
+        // await fs.writeFile(data.full_source, newFrontmatter + '\n' + data.content, 'utf-8');
+        // hexo.log.info(`Updated file: ${data.full_source}`);
 
         hexo.log.info(`Tagged post: ${data.title || data.source} - Category: ${category}, Tags: ${tags.join(', ')}`);
     } catch (error) {
