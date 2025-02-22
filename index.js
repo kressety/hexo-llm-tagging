@@ -1,18 +1,21 @@
 const { OpenAI } = require('openai');
 const MarkdownIt = require('markdown-it');
 const htmlToText = require('html-to-text');
+const front = require('hexo-front-matter');
+const fs = require('hexo-fs');
 
 // 获取纯文本内容
-function getPlainTextContent(content) {
+function getPlainTextContent(content, title) {
     const md = new MarkdownIt();
     const html = md.render(content);
-    const plainText = htmlToText.fromString(html, { wordwrap: false });
-    const maxLength = 4000; // GPT 输入限制
-    return plainText.length > maxLength ? plainText.substring(0, maxLength) : plainText;
+    const plainText = htmlToText.convert(html, { wordwrap: false });
+    const maxLength = 4000;
+    const text = `${title}: ${plainText}`; // 添加标题
+    return text.length > maxLength ? text.substring(0, maxLength) : text;
 }
 
 // 使用 GPT 生成分类和标签
-async function generateTagsWithGPT(content, client, config) {
+async function generateTagsWithGPT(content, client, config, hexo) {
     const prompt = `
     Analyze the following article content and generate:
     1. A single category (a broad topic the article belongs to).
@@ -22,60 +25,92 @@ async function generateTagsWithGPT(content, client, config) {
       "category": "category_name",
       "tags": ["tag1", "tag2", "tag3"]
     }
+    Do not include code block markers (e.g., \`\`\`json or \`\`\`) in your response.
     
     Content:
     ${content}
   `;
 
-    const response = await client.chat.completions.create({
-        model: config.model,
-        messages: [
-            { role: 'system', content: 'You are a helpful assistant that generates categories and tags for articles.' },
-            { role: 'user', content: prompt },
-        ],
-        max_tokens: config.max_tokens || 100,
-        temperature: 0.7,
-    });
+    try {
+        const response = await client.chat.completions.create({
+            model: config.model,
+            messages: [
+                { role: 'system', content: 'You are a helpful assistant that generates categories and tags for articles.' },
+                { role: 'user', content: prompt },
+            ],
+            max_tokens: config.max_tokens || 100,
+            temperature: 0.7,
+        });
 
-    const result = JSON.parse(response.choices[0].message.content.trim());
-    return result;
+        let rawResponse = response.choices[0].message.content.trim();
+        rawResponse = rawResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+
+        const result = JSON.parse(rawResponse);
+        return result;
+    } catch (error) {
+        hexo.log.error(`GPT API call failed: ${error.message}`);
+        hexo.log.debug(`Raw GPT response: ${response?.choices[0]?.message?.content || 'No response'}`);
+        throw error;
+    }
 }
 
 // 主插件逻辑
-module.exports = (hexo) => {
-    // 初始化 OpenAI 客户端
-    const config = hexo.config.llm_tagging;
-    if (!config || !config.api_key || !config.model) {
-        throw new Error('llm_tagging config is incomplete');
+const config = hexo.config.llm_tagging;
+if (!config || !config.api_key || !config.model) {
+    hexo.log.error('llm_tagging config is incomplete. Required: api_key, model');
+    return;
+}
+
+const client = new OpenAI({
+    apiKey: config.api_key,
+    baseURL: config.endpoint || 'https://api.openai.com/v1',
+});
+
+hexo.log.info('hexo-llm-tagging plugin initialized');
+
+hexo.extend.filter.register('before_post_render', async (data) => {
+    // 只处理 _posts 目录下的文章
+    if (!data.source || !data.source.startsWith('_posts/')) {
+        hexo.log.debug(`Skipping non-post page: ${data.title || data.source}`);
+        return data;
     }
 
-    const client = new OpenAI({
-        apiKey: config.api_key,
-        baseURL: config.endpoint || 'https://api.openai.com/v1', // 默认使用 OpenAI 端点
-    });
+    hexo.log.info(`Processing post: ${data.title || data.source}`);
 
-    hexo.extend.filter.register('post_process', async (post) => {
-        const plainText = getPlainTextContent(post.content);
-        if (!plainText) {
-            hexo.log.warn(`No content found for post: ${post.title}`);
-            return post;
-        }
+    const plainText = getPlainTextContent(data.content, data.title);
+    if (!plainText) {
+        hexo.log.warn(`No content found for post: ${data.title || data.source}`);
+        return data;
+    }
 
-        try {
-            hexo.log.info(`Tagging post: ${post.title}`);
-            const { category, tags } = await generateTagsWithGPT(plainText, client, config);
+    try {
+        const { category, tags } = await generateTagsWithGPT(plainText, client, config, hexo);
 
-            // 更新前置元数据
-            post.front_matter.category = category;
-            if (post.front_matter.tags) {
-                post.front_matter.tags = Array.from(new Set(post.front_matter.tags.concat(tags)));
-            } else {
-                post.front_matter.tags = tags;
-            }
-        } catch (error) {
-            hexo.log.error(`Failed to tag post ${post.title}: ${error.message}`);
-        }
+        // 解析当前 front-matter
+        const frontmatter = front.parse(data.raw);
 
-        return post;
-    });
-};
+        // 更新 category 和 tags
+        frontmatter.category = category;
+        // 如果已有 tags，合并，否则直接赋值
+        const existingTags = Array.isArray(frontmatter.tags) ? frontmatter.tags : [];
+        frontmatter.tags = Array.from(new Set([...existingTags, ...tags]));
+
+        // 生成新的 front-matter 字符串
+        let newFrontmatter = front.stringify(frontmatter);
+        newFrontmatter = '---\n' + newFrontmatter;
+
+        // 更新 data 对象以影响渲染
+        data.category = category;
+        data.tags = frontmatter.tags;
+
+        // 可选：写入源文件（如果需要持久化）
+        await fs.writeFile(data.full_source, newFrontmatter + '\n' + data.content, 'utf-8');
+        hexo.log.info(`Updated file: ${data.full_source}`);
+
+        hexo.log.info(`Tagged post: ${data.title || data.source} - Category: ${category}, Tags: ${tags.join(', ')}`);
+    } catch (error) {
+        hexo.log.error(`Failed to tag post ${data.title || data.source}: ${error.message}`);
+    }
+
+    return data;
+});
