@@ -81,10 +81,20 @@ hexo.extend.filter.register('before_post_render', async (data) => {
     }
 
     try {
-        const { category, tags } = await generateTagsWithGPT(plainText, data.title, client, config, hexo);
-
-        // 读取源文件以获取现有 front-matter
+        // 读取源文件的 front-matter
         const parsed = front.parse(data.raw);
+
+        // 检查是否已有 categories 或 tags
+        const hasCategories = parsed.categories && Array.isArray(parsed.categories) && parsed.categories.length > 0;
+        const hasTags = parsed.tags && Array.isArray(parsed.tags) && parsed.tags.length > 0;
+
+        if (hasCategories || hasTags) {
+            hexo.log.info(`Post ${data.title || data.source} already has categories or tags, skipping GPT tagging.`);
+            return data; // 跳过 API 调用，直接返回
+        }
+
+        // 如果没有 categories 或 tags，则调用 GPT API
+        const { category, tags } = await generateTagsWithGPT(plainText, data.title, client, config, hexo);
 
         // 更新 front-matter
         parsed.categories = [category]; // 每次覆盖为单个分类
