@@ -23,6 +23,8 @@
     "url": "https://github.com/kressety/hexo-llm-tagging"
   },
   "dependencies": {
+    "hexo-front-matter": "^4.2.1",
+    "hexo-fs": "^5.0.0",
     "html-to-text": "^9.0.5",
     "markdown-it": "^14.1.0",
     "openai": "^4.85.3"
